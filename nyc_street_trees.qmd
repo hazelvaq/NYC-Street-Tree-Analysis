@@ -16,28 +16,33 @@ library(dplyr)
 library(sf)
 library(ggplot2)
 library(here)
+library(tmap)
 ```
 
 ```{r}
+# Import street trees data
 trees <- st_read(here("./data/geo_export_145e1dbe-8d16-4451-aa07-a8915754603a.shp"))
+
+# Import NYC zip code boundaries
+nyc_shape <- st_read(here("./data/geo_export_19e55f80-b2f0-42ae-a040-dfc2cdce044d.shp"))
+
+# Check CRS match
+#st_crs(trees) == st_crs(nyc_shape)
+
 ```
 
 ```{r}
 # Group street tree frequency by zip code
 zip_trees <- trees %>% 
+  filter(boroname != "Staten Island") %>% 
   group_by(zipcode) %>% 
-  summarise(tree_frequency = n())
+  summarise(tree_frequency = n()) 
 
-
-ggplot(zip_trees) +
-  geom_sf(aes('tree_frequency'))
-
-plot(zip_trees)
-
+# Plot tree frequency for zip code
 ggplot() +
-  geom_sf(data = zip_trees, aes(fill = tree_frequency)) +
-  scale_fill_viridis_c(name = "Tree Frequency")
-  
+  geom_sf(data = zip_trees, aes(color = tree_frequency)) + 
+  scale_colour_gradientn(colours = terrain.colors(10)) 
+
 
 
 
