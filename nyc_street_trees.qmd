@@ -16,7 +16,7 @@ library(dplyr)
 library(sf)
 library(ggplot2)
 library(here)
-library(tmap)
+library(leaflet)
 ```
 
 ```{r}
@@ -28,22 +28,69 @@ nyc_shape <- st_read(here("./data/geo_export_19e55f80-b2f0-42ae-a040-dfc2cdce044
 
 # Check CRS match
 #st_crs(trees) == st_crs(nyc_shape)
-
 ```
 
 ```{r}
-# Group street tree frequency by zip code
+## ----------- Data Preparation -------------------------------------------------
+# Group street tree frequency by zip code and remove SI
 zip_trees <- trees %>% 
   filter(boroname != "Staten Island") %>% 
   group_by(zipcode) %>% 
-  summarise(tree_frequency = n()) 
+  summarise(tree_frequency = n()) %>% 
+  st_drop_geometry()
 
+# Filter NYC boundaries to exclude SI
+# How? Should i do it based on boundaries that are present in zip trees
+nyc_shape <- nyc_shape %>% 
+  rename("zipcode" = modzcta) %>% 
+  select(c(zipcode,pop_est))
+  
+# Filter NYC shape to match zip_trees zipcodes
+nyc_shape <- nyc_shape %>%
+      filter(zipcode %in% zip_trees$zipcode)
+
+# Spatially join by zipcode
+nyc_trees <- left_join(nyc_shape, zip_trees, by = "zipcode")
+plot(nyc_trees)
+
+
+# Set the correct CRS (assuming it should be WGS84)
+nyc_trees <- st_set_crs(nyc_trees, "+proj=longlat +datum=WGS84")
+```
+
+```{r}
+# --- Interactive Plot ----------------------------------------------------------
 # Plot tree frequency for zip code
 ggplot() +
-  geom_sf(data = zip_trees, aes(color = tree_frequency)) + 
-  scale_colour_gradientn(colours = terrain.colors(10)) 
+  geom_sf(data = nyc_trees, aes(fill = tree_frequency))
 
+# Define color palette
+pal <- colorBin("viridis", domain = nyc_trees$tree_frequency, reverse = TRUE)
 
-
+leaflet() %>%
+  addPolygons(data = nyc_trees,
+              fillColor = ~pal(nyc_trees$tree_frequency),
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              dashArray = "3",
+              fillOpacity = 1,
+              # Add pop up text 
+              highlightOptions = highlightOptions(
+                # when you hover over there will be pop up text
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 1,
+                bringToFront = TRUE))  %>%
+  # add legend based on tree frequency
+  addLegend(
+    pal = pal,
+    values = nyc_trees$tree_frequency,
+    opacity = 0.7,
+    title = paste("Tree Frequency"),
+    position = "bottomright"
+  ) %>%
+  addTiles()
 
 ```
