@@ -4,23 +4,41 @@ format: html
 editor: visual
 ---
 
-## Quarto
+## About
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+#### 
 
-## Running Code
+#### Data Analysis
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
+```{r, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(here)
 ```
 
-You can add options to executable code like this
-
 ```{r}
-#| echo: false
-2 * 2
+trees <- st_read(here("./data/geo_export_145e1dbe-8d16-4451-aa07-a8915754603a.shp"))
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+# Group street tree frequency by zip code
+zip_trees <- trees %>% 
+  group_by(zipcode) %>% 
+  summarise(tree_frequency = n())
+
+
+ggplot(zip_trees) +
+  geom_sf(aes('tree_frequency'))
+
+plot(zip_trees)
+
+ggplot() +
+  geom_sf(data = zip_trees, aes(fill = tree_frequency)) +
+  scale_fill_viridis_c(name = "Tree Frequency")
+  
+
+
+
+```
