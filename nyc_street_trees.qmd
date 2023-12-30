@@ -39,6 +39,10 @@ zip_trees <- trees %>%
   summarise(tree_frequency = n()) %>% 
   st_drop_geometry()
 
+
+zp <- left_join(zip_trees,trees, by = "zipcode") %>% 
+  select(c(zipcode,nta_name,tree_frequency)) 
+ 
 # Filter NYC boundaries to exclude SI
 # How? Should i do it based on boundaries that are present in zip trees
 nyc_shape <- nyc_shape %>% 
@@ -60,13 +64,16 @@ nyc_trees <- st_set_crs(nyc_trees, "+proj=longlat +datum=WGS84")
 
 ```{r}
 # --- Interactive Plot ----------------------------------------------------------
-# Plot tree frequency for zip code
-ggplot() +
-  geom_sf(data = nyc_trees, aes(fill = tree_frequency))
-
 # Define color palette
 pal <- colorBin("viridis", domain = nyc_trees$tree_frequency, reverse = TRUE)
 
+# Add label when hover over zipcode block
+labels <- sprintf( 
+  "<strong>ZIP Code:%s</strong><br/>%g trees",
+  nyc_trees$zipcode,
+  nyc_trees$tree_frequency) %>% lapply(htmltools::HTML)
+  
+# Interactive map 
 leaflet() %>%
   addPolygons(data = nyc_trees,
               fillColor = ~pal(nyc_trees$tree_frequency),
@@ -75,14 +82,18 @@ leaflet() %>%
               color = "black",
               dashArray = "3",
               fillOpacity = 1,
-              # Add pop up text 
+              # Add pop up text when hovering
               highlightOptions = highlightOptions(
-                # when you hover over there will be pop up text
                 weight = 5,
                 color = "#666",
                 dashArray = "",
                 fillOpacity = 1,
-                bringToFront = TRUE))  %>%
+                bringToFront = TRUE),
+              label = labels,
+              labelOptions = labelOptions(
+    style = list("font-weight" = "normal", padding = "3px 8px"),
+    textsize = "15px",
+    direction = "auto"))  %>%
   # add legend based on tree frequency
   addLegend(
     pal = pal,
