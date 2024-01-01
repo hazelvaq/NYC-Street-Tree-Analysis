@@ -17,6 +17,7 @@ library(sf)
 library(ggplot2)
 library(here)
 library(leaflet)
+library(gt)
 ```
 
 ```{r}
@@ -39,10 +40,12 @@ zip_trees <- trees %>%
   summarise(tree_frequency = n()) %>% 
   st_drop_geometry()
 
+# Add ZIP code names
+zip_trees <- left_join(zip_trees,trees, by = "zipcode") %>% 
+  select(c(zipcode,nta_name,tree_frequency, boroname)) %>%
+  distinct(zipcode, .keep_all = TRUE) %>% 
+  rename("name" = nta_name)
 
-zp <- left_join(zip_trees,trees, by = "zipcode") %>% 
-  select(c(zipcode,nta_name,tree_frequency)) 
- 
 # Filter NYC boundaries to exclude SI
 # How? Should i do it based on boundaries that are present in zip trees
 nyc_shape <- nyc_shape %>% 
@@ -54,9 +57,8 @@ nyc_shape <- nyc_shape %>%
       filter(zipcode %in% zip_trees$zipcode)
 
 # Spatially join by zipcode
-nyc_trees <- left_join(nyc_shape, zip_trees, by = "zipcode")
-plot(nyc_trees)
-
+nyc_trees <- left_join(nyc_shape, zip_trees, by = "zipcode") %>%
+  mutate("tree_per_person" = tree_frequency/pop_est)
 
 # Set the correct CRS (assuming it should be WGS84)
 nyc_trees <- st_set_crs(nyc_trees, "+proj=longlat +datum=WGS84")
@@ -69,7 +71,8 @@ pal <- colorBin("viridis", domain = nyc_trees$tree_frequency, reverse = TRUE)
 
 # Add label when hover over zipcode block
 labels <- sprintf( 
-  "<strong>ZIP Code:%s</strong><br/>%g trees",
+  "<strong>%s(ZIP Code:%s)</strong><br/>%g trees",
+  nyc_trees$name,
   nyc_trees$zipcode,
   nyc_trees$tree_frequency) %>% lapply(htmltools::HTML)
   
@@ -103,5 +106,25 @@ leaflet() %>%
     position = "bottomright"
   ) %>%
   addTiles()
+```
+
+I think it'll be interesting to see if tree per person show a relationship with asthma rates
+
+```{r}
+# Trees per person stats summary
+
+trees_per_person <- sort(nyc_trees$tree_per_person, decreasing = TRUE)
+
+
+nyc_trees_a <- nyc_trees[order(nyc_trees$tree_per_person, decreasing = TRUE),] %>% 
+  st_drop_geometry() %>% relocate(boroname, name, tree_frequency) %>% 
+  rename("Borough" = boroname, "Name" = name, "Tree count" = tree_frequency,
+         "ZIP code" = zipcode,
+         "Estimated Population" = pop_est,
+         "Trees per person" = tree_per_person)
+
+
+gt(head(nyc_trees_a,5))
+
 
 ```
